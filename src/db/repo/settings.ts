@@ -73,7 +73,18 @@ interface Row {
   seeded_intents: string | null;
 }
 
+// Profile writes are read-modify-write of the whole row, so two in flight at
+// once can resurrect stale columns (e.g. undo a fresh Pro grant). Serialize
+// them, and let reads wait for writes already queued so hydrate() and sync
+// never see a profile older than the in-memory store.
+let writeChain: Promise<void> = Promise.resolve();
+
 export async function getProfile(): Promise<LocalProfile> {
+  await writeChain;
+  return readProfile();
+}
+
+async function readProfile(): Promise<LocalProfile> {
   const r = await first<Row>('SELECT * FROM local_profile WHERE id = 1');
   return {
     display_name: r?.display_name ?? null,
@@ -104,8 +115,14 @@ export async function getProfile(): Promise<LocalProfile> {
   };
 }
 
-export async function updateProfile(patch: Partial<LocalProfile>) {
-  const cur = await getProfile();
+export function updateProfile(patch: Partial<LocalProfile>): Promise<void> {
+  const write = writeChain.then(() => writeProfile(patch));
+  writeChain = write.catch(() => {});
+  return write;
+}
+
+async function writeProfile(patch: Partial<LocalProfile>) {
+  const cur = await readProfile();
   const next = { ...cur, ...patch };
   try {
     await run(

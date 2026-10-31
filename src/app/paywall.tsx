@@ -1,7 +1,7 @@
 import type { Product, ProductSubscription } from 'expo-iap';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Lock, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import {
     purchase,
     restore,
     type ProductInfo,
+    type PurchaseOutcome,
 } from '@/lib/entitlements';
 import { goBack } from '@/lib/nav';
 import { FREE_LIMITS, PRO_LIMITS } from '@/lib/tiers';
@@ -86,6 +87,15 @@ export default function PaywallScreen() {
   const [selected, setSelected] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  // A purchase can settle after the paywall was closed - don't touch state or
+  // navigate from an unmounted screen (router.back() would pop the screen below).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,10 +120,17 @@ export default function PaywallScreen() {
   }, [load]);
 
   const buy = async () => {
-    if (!selected) return;
+    if (!selected || busy) return;
     setBusy(true);
-    const outcome = await purchase(selected);
-    setBusy(false);
+    let outcome: PurchaseOutcome = 'failed';
+    try {
+      outcome = await purchase(selected);
+    } catch {
+      outcome = 'failed';
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+    if (!mounted.current) return;
     if (outcome === 'purchased') {
       router.back();
     } else if (outcome === 'failed') {
@@ -123,9 +140,17 @@ export default function PaywallScreen() {
   };
 
   const doRestore = async () => {
+    if (busy) return;
     setBusy(true);
-    const tier = await restore();
-    setBusy(false);
+    let tier: Awaited<ReturnType<typeof restore>> = 'free';
+    try {
+      tier = await restore();
+    } catch {
+      tier = 'free';
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+    if (!mounted.current) return;
     if (tier !== 'free') {
       router.back();
     } else {

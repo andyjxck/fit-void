@@ -871,12 +871,23 @@ export async function signOutWipe(): Promise<'ok' | 'sync-failed'> {
 
 /** Mirror local_profile into the profiles table and pull has_void_pro back. */
 async function syncProfileRow(sb: SupabaseClient, userId: string) {
-  const local = await getProfile();
+  const profile = await getProfile();
   const { data: remote } = await sb
     .from('profiles')
     .select('weight_unit, default_bar_weight, has_void_pro, void_tier, display_name, updated_at')
     .eq('id', userId)
     .maybeSingle();
+  // Re-read the entitlement AFTER the network round-trip, from the in-memory
+  // store (updated synchronously by grantTier): a purchase / reconcile that
+  // landed while this request was in flight must not be overwritten with the
+  // tier read before it. The store is hydrated before any sync starts.
+  const s = useSettings.getState();
+  const local = {
+    ...profile,
+    has_void_pro: s.has_void_pro,
+    void_tier: s.void_tier,
+    void_pro_owner: s.void_pro_owner,
+  };
 
   // A local grant only counts toward THIS account if it isn't bound to a
   // different one: void_pro_owner === null is an unclaimed device purchase
@@ -907,10 +918,8 @@ async function syncProfileRow(sb: SupabaseClient, userId: string) {
         ? 'promax'
         : 'pro'
       : 'free';
-  await sb
-    .from('profiles')
-    .update({ has_void_pro: merged !== 'free', void_tier: merged })
-    .eq('id', userId);
+  // Write locally first, in the same tick as the re-read above, so no grant
+  // can slip in between the read and the write. Then push the merged value.
   useSettings
     .getState()
     .set({
@@ -920,6 +929,10 @@ async function syncProfileRow(sb: SupabaseClient, userId: string) {
       // bound, an unclaimed device purchase claims, remote-side grants adopt.
       void_pro_owner: merged === 'free' ? null : userId,
     });
+  await sb
+    .from('profiles')
+    .update({ has_void_pro: merged !== 'free', void_tier: merged })
+    .eq('id', userId);
 }
 
 /**
