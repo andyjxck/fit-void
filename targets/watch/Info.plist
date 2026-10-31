@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Fit Void reads your heart rate to show it on the pulse face and during cardio sessions.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Fit Void saves heart rate and cardio session data you track on your watch to Apple Health.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Fit Void uses GPS to measure distance during outdoor cardio sessions.</string>
+  </dict>
+</plist>

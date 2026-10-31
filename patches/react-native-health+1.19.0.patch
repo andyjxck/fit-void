@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
+index e8ddce1..1f1922c 100644
+--- a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
++++ b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
+@@ -841,7 +841,7 @@ -(void)startObserving {
+ - (void)emitEventInternal:(NSNotification *)notification {
+   if (self.hasListeners) {
+     self.callableJSModules = [RCTAppleHealthKit sharedJsModule];
+-    [self.callableJSModules setBridge:self.bridge];
++    // Patched for RN 0.79+ - setBridge removed from RCTCallableJSModules
+     [self sendEventWithName:notification.name
+                    body:notification.userInfo];
+   }

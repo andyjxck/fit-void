@@ -16,5 +16,10 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/lib/__tests__",
+    "supabase/functions"
   ]
 }
